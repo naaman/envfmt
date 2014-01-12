@@ -2,8 +2,8 @@ package main
 
 import (
 	"bufio"
-	"io"
 	"errors"
+	"io"
 	"os"
 )
 
@@ -62,6 +62,7 @@ func (s *readType) parse(c byte, k *[]byte, v *[]byte, w io.Writer) parseStateFu
 	case isIgnored(c):
 		return new(endType)
 	default:
+		w.Write([]byte{c})
 		panic(InvalidEnvironmentVariableName)
 	}
 }
@@ -80,13 +81,16 @@ func (s *endType) parse(c byte, k *[]byte, v *[]byte, w io.Writer) parseStateFun
 func (s *readProc) parse(c byte, k *[]byte, v *[]byte, w io.Writer) parseStateFunc {
 	switch c {
 	case 0:
-		w.Write([]byte{'\n'})
 		w.Write(*k)
 		w.Write([]byte{'='})
 		w.Write(*v)
+		w.Write([]byte{'\n'})
 		*k = nil
 		*v = nil
 		return new(startLine)
+	case '\n':
+		*v = append(*v, '\\', 'n')
+		return new(readProc)
 	default:
 		*v = append(*v, c)
 		return new(readProc)
@@ -103,9 +107,9 @@ func isIgnored(c byte) bool {
 
 // http://pubs.opengroup.org/onlinepubs/000095399/basedefs/xbd_chap08.html
 func isValid(c byte) bool {
-	return (c > '0' && c < '9') ||
-		(c > 'A' && c < 'Z') ||
-		(c > 'a' && c < 'z') ||
+	return (c >= '0' && c <= '9') ||
+		(c >= 'A' && c <= 'Z') ||
+		(c >= 'a' && c <= 'z') ||
 		(c == '_')
 }
 
