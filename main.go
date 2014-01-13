@@ -2,18 +2,36 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
+	"flag"
 	"io"
 	"os"
-	"flag"
+	"strconv"
+	"strings"
 )
 
 var (
 	InvalidEnvironmentVariableName = errors.New("Invalid characters for environment variable name.")
-	fEnvFile = flag.String("file", ".env", "/path/to/environment/file")
-	fFilter = flag.String("filter", "PATH|GIT_DIR|CPATH|CPPATH|LD_PRELOAD|LIBRARY_PATH|PS1", "KEYS|TO|FILTER")
-	fInvert = flag.Bool("invert", true, "Match the opposite of the filter.")
+	fEnvFile                       = flag.String("file", ".env", "/path/to/environment/file")
+	fFilter                        = flag.String("filter", "PATH|GIT_DIR|CPATH|CPPATH|LD_PRELOAD|LIBRARY_PATH|PS1", "KEYS|TO|FILTER")
+	fInvert                        = flag.Bool("invert", true, "Match the opposite of the filter.")
+	filter                         [][]byte
 )
+
+func init() {
+	flag.Parse()
+	for _, f := range []string{*fEnvFile, *fFilter, strconv.FormatBool(*fInvert)} {
+		if f == "" {
+			flag.Usage()
+			os.Exit(1)
+		}
+	}
+
+	for _, s := range strings.Split(*fFilter, "|") {
+		filter = append(filter, []byte(s))
+	}
+}
 
 func parse(envFile io.Reader, out io.Writer) error {
 	r := bufio.NewReader(envFile)
@@ -85,10 +103,12 @@ func (s *endType) parse(c byte, k *[]byte, v *[]byte, w io.Writer) parseStateFun
 func (s *readProc) parse(c byte, k *[]byte, v *[]byte, w io.Writer) parseStateFunc {
 	switch c {
 	case 0:
-		w.Write(*k)
-		w.Write([]byte{'='})
-		w.Write(*v)
-		w.Write([]byte{'\n'})
+		if !isFiltered(k) {
+			w.Write(*k)
+			w.Write([]byte{'='})
+			w.Write(*v)
+			w.Write([]byte{'\n'})
+		}
 		*k = nil
 		*v = nil
 		return new(startLine)
@@ -99,6 +119,15 @@ func (s *readProc) parse(c byte, k *[]byte, v *[]byte, w io.Writer) parseStateFu
 		*v = append(*v, c)
 		return new(readProc)
 	}
+}
+
+func isFiltered(k *[]byte) bool {
+	for _, kFiltered := range filter {
+		if bytes.Equal(kFiltered, *k) {
+			return true
+		}
+	}
+	return false
 }
 
 func isWhitespace(c byte) bool {
@@ -118,7 +147,6 @@ func isValid(c byte) bool {
 }
 
 func main() {
-	flag.Parse()
-	envFile, _ := os.Open(&fEnvFile)
+	envFile, _ := os.Open(*fEnvFile)
 	parse(envFile, os.Stdout)
 }
