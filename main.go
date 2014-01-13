@@ -5,10 +5,14 @@ import (
 	"errors"
 	"io"
 	"os"
+	"flag"
 )
 
 var (
 	InvalidEnvironmentVariableName = errors.New("Invalid characters for environment variable name.")
+	fEnvFile = flag.String("file", ".env", "/path/to/environment/file")
+	fFilter = flag.String("filter", "PATH|GIT_DIR|CPATH|CPPATH|LD_PRELOAD|LIBRARY_PATH|PS1", "KEYS|TO|FILTER")
+	fInvert = flag.Bool("invert", true, "Match the opposite of the filter.")
 )
 
 func parse(envFile io.Reader, out io.Writer) error {
@@ -114,7 +118,7 @@ func isValid(c byte) bool {
 }
 
 func main() {
-	envFilePath := os.Args[1]
-	envFile, _ := os.Open(envFilePath)
+	flag.Parse()
+	envFile, _ := os.Open(&fEnvFile)
 	parse(envFile, os.Stdout)
 }
