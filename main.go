@@ -104,17 +104,15 @@ func (s *readProc) parse(c byte, k *[]byte, v *[]byte, w io.Writer) parseStateFu
 	switch c {
 	case 0:
 		if !isFiltered(k) {
+			w.Write([]byte("export "))
 			w.Write(*k)
-			w.Write([]byte{'='})
+			w.Write([]byte{'=', '"'})
 			w.Write(*v)
-			w.Write([]byte{'\n'})
+			w.Write([]byte{'"', '\n'})
 		}
 		*k = nil
 		*v = nil
 		return new(startLine)
-	case '\n':
-		*v = append(*v, '\\', 'n')
-		return new(readProc)
 	default:
 		*v = append(*v, c)
 		return new(readProc)
